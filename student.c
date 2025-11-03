@@ -1,11 +1,10 @@
 #include <stdio.h>
-#include <stdlib.h> // For system("cls") and exit()
-#include <string.h> // For strcpy(), strcmp(), strcspn()
+#include <stdlib.h> 
+#include <string.h> 
 
-// This is the filename where our data will be stored
 const char* FILENAME = "students.dat";
 
-//The 'struct' that defines our Student "schema" 
+// The 'struct' that defines our Student "schema" 
 struct Student {
     int roll_no;
     char name[50];
@@ -16,7 +15,7 @@ struct Student {
     char grade;
 };
 
-// Function Prototypes (Declarations) 
+//  Function Prototypes (Declarations) 
 void add_student();
 void display_all_students();
 void search_student();
@@ -83,7 +82,7 @@ int main() {
     return 0;
 }
 
-// --- Helper function to calculate grade ---
+// Utility Functions 
 char calculate_grade(int total) {
     float avg = (float)total / 3.0;
     if (avg >= 90) return 'A';
@@ -93,12 +92,11 @@ char calculate_grade(int total) {
     return 'F';
 }
 
-// --- 1. Add Student (CREATE) ---
+// 1 Add a New Student
 void add_student() {
     struct Student s;
     FILE* fp;
 
-    // Open the file in "append binary" mode to add to the end
     fp = fopen(FILENAME, "ab");
     if (fp == NULL) {
         printf("Error: Cannot open file!\n");
@@ -114,7 +112,7 @@ void add_student() {
 
     printf("Enter Name: ");
     fgets(s.name, 50, stdin);
-    s.name[strcspn(s.name, "\n")] = 0; // Remove trailing newline from fgets
+    s.name[strcspn(s.name, "\n")] = 0; 
 
     printf("Enter Marks in C: ");
     scanf("%d", &s.marks_c);
@@ -136,7 +134,7 @@ void add_student() {
     printf("\nStudent record added successfully!\n");
 }
 
-// --- 2. Display All Students (READ) ---
+// 2 Display All Students (READ)
 void display_all_students() {
     struct Student s;
     FILE* fp;
@@ -167,7 +165,7 @@ void display_all_students() {
     fclose(fp);
 }
 
-// --- 3. Search for a Student (READ) ---
+// 3 Search a Student (READ)
 void search_student() {
     struct Student s;
     FILE* fp;
@@ -178,3 +176,161 @@ void search_student() {
         printf("File not found or no records exist.\n");
         return;
     }
+
+    printf("Enter Roll No to search: ");
+    scanf("%d", &roll_to_search);
+
+    clear_screen();
+    printf("--- Search Result ---\n");
+
+    while (fread(&s, sizeof(struct Student), 1, fp) == 1) {
+        if (s.roll_no == roll_to_search) {
+            printf("\nRecord Found!\n\n");
+            printf("Roll No: %d\n", s.roll_no);
+            printf("Name: %s\n", s.name);
+            printf("C Marks: %d\n", s.marks_c);
+            printf("Math Marks: %d\n", s.marks_math);
+            printf("Physics Marks: %d\n", s.marks_physics);
+            printf("Total Marks: %d\n", s.total);
+            printf("Grade: %c\n", s.grade);
+            found = 1;
+            break;
+        }
+    }
+
+    if (!found) {
+        printf("\nRecord with Roll No %d not found.\n", roll_to_search);
+    }
+
+    fclose(fp);
+}
+
+// 4 Modify a Student (UPDATE)
+void modify_student() {
+    struct Student s;
+    FILE* fp;
+    int roll_to_modify, found = 0;
+    long record_size = sizeof(struct Student);
+
+    // Open in "read-write binary" mode
+    fp = fopen(FILENAME, "r+b"); 
+    if (fp == NULL) {
+        printf("File not found or no records exist.\n");
+        return;
+    }
+
+    printf("Enter Roll No to modify: ");
+    scanf("%d", &roll_to_modify);
+    clear_input_buffer();
+
+    while (fread(&s, record_size, 1, fp) == 1) {
+        if (s.roll_no == roll_to_modify) {
+            found = 1;
+            clear_screen();
+            printf("--- Modifying Record for Roll No: %d ---\n", s.roll_no);
+            printf("Old Name: %s\n", s.name);
+            
+            // Get new data
+            printf("Enter New Name: ");
+            fgets(s.name, 50, stdin);
+            s.name[strcspn(s.name, "\n")] = 0; 
+
+            printf("Enter New Marks in C: ");
+            scanf("%d", &s.marks_c);
+
+            printf("Enter New Marks in Math: ");
+            scanf("%d", &s.marks_math);
+
+            printf("Enter New Marks in Physics: ");
+            scanf("%d", &s.marks_physics);
+
+            // Recalculate
+            s.total = s.marks_c + s.marks_math + s.marks_physics;
+            s.grade = calculate_grade(s.total);
+
+            // Move to the beginning of the record
+            fseek(fp, -record_size, SEEK_CUR); 
+            
+            fwrite(&s, record_size, 1, fp); 
+
+            printf("\nRecord updated successfully!\n");
+            break;
+        }
+    }
+
+    if (!found) {
+        printf("\nRecord with Roll No %d not found.\n", roll_to_modify);
+    }
+
+    fclose(fp);
+}
+
+// 5. Delete a Student (DELETE)
+void delete_student() {
+    struct Student s;
+    FILE *fp_original, *fp_temp;
+    int roll_to_delete, found = 0;
+    const char* TEMP_FILENAME = "temp.dat";
+
+    // Open original file for reading
+    fp_original = fopen(FILENAME, "rb");
+    if (fp_original == NULL) {
+        printf("File not found or no records exist.\n");
+        return;
+    }
+
+    // Open temp file for writing
+    fp_temp = fopen(TEMP_FILENAME, "wb");
+    if (fp_temp == NULL) {
+        printf("Error: Cannot create temporary file.\n");
+        fclose(fp_original);
+        return;
+    }
+
+    printf("Enter Roll No to delete: ");
+    scanf("%d", &roll_to_delete);
+
+    // Read records from original file and write to temp file
+    while (fread(&s, sizeof(struct Student), 1, fp_original) == 1) {
+        if (s.roll_no == roll_to_delete) {
+            found = 1; // Mark as found, but DO NOT write to temp file
+        } else {
+
+            fwrite(&s, sizeof(struct Student), 1, fp_temp);
+        }
+    }
+
+    fclose(fp_original);
+    fclose(fp_temp);
+
+    // Replace original file with temp file
+    if (found) {
+        remove(FILENAME);  
+        rename(TEMP_FILENAME, FILENAME); 
+        printf("\nRecord with Roll No %d deleted successfully.\n", roll_to_delete);
+    } else {
+        remove(TEMP_FILENAME); 
+        printf("\nRecord with Roll No %d not found.\n", roll_to_delete);
+    }
+}
+
+
+//Utility Functions 
+void clear_screen() {
+    #ifdef _WIN32
+        system("cls"); // For Windows
+    #else
+        system("clear"); // For macOS/Linux
+    #endif
+}
+
+
+void press_enter_to_continue() {
+    printf("\nPress Enter to return to the main menu...");
+    getchar(); // Wait for the Enter key
+}
+
+void clear_input_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
